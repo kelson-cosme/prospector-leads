@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,12 +12,105 @@ interface GoogleMapsSearchProps {
   onLeadFound: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
 
+interface GooglePlace {
+  name: string;
+  formatted_address: string;
+  formatted_phone_number?: string;
+  website?: string;
+  place_id: string;
+  types: string[];
+}
+
 const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const { toast } = useToast();
   const { addLead } = useLeads();
+
+  useEffect(() => {
+    // Verificar se já existe uma API key salva no localStorage
+    const savedApiKey = localStorage.getItem('googleMapsApiKey');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    } else {
+      setShowApiKeyInput(true);
+    }
+  }, []);
+
+  const saveApiKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('googleMapsApiKey', apiKey);
+      setShowApiKeyInput(false);
+      toast({
+        title: "API Key salva",
+        description: "Sua chave da API do Google Maps foi salva localmente"
+      });
+    } else {
+      toast({
+        title: "Chave inválida",
+        description: "Por favor, informe uma chave de API válida",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const searchGooglePlaces = async (keyword: string, location: string) => {
+    // Construindo a URL para a API Nearby Search do Google Maps Places
+    const url = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
+    
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK') {
+        // Processando os resultados
+        const places = data.results;
+        const placeResults: GooglePlace[] = [];
+        
+        // Para cada lugar, buscar detalhes adicionais
+        for (const place of places.slice(0, 5)) { // Limitando a 5 resultados para evitar muitas requisições
+          try {
+            const detailsUrl = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
+            const detailsResponse = await fetch(detailsUrl);
+            const detailsData = await detailsResponse.json();
+            
+            if (detailsData.status === 'OK') {
+              placeResults.push({
+                ...detailsData.result,
+                place_id: place.place_id,
+                types: place.types
+              });
+            }
+          } catch (error) {
+            console.error('Erro ao buscar detalhes do lugar:', error);
+          }
+        }
+        
+        return placeResults;
+      } else {
+        throw new Error(`Erro na API: ${data.status}`);
+      }
+    } catch (error) {
+      console.error('Erro na busca:', error);
+      throw error;
+    }
+  };
+
+  const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
+    return {
+      businessName: place.name,
+      contactName: 'Contato não disponível',
+      phone: place.formatted_phone_number || 'Não disponível',
+      email: `contato@${place.name.toLowerCase().replace(/\s+/g, '')}.exemplo`,
+      address: place.formatted_address,
+      industry: place.types[0] || keyword,
+      notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}`,
+      status: 'new' as LeadStatus
+    };
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,59 +124,48 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       return;
     }
     
+    if (!apiKey) {
+      toast({
+        title: "API Key necessária",
+        description: "Por favor, configure sua chave da API do Google Maps",
+        variant: "destructive"
+      });
+      setShowApiKeyInput(true);
+      return;
+    }
+    
     setIsSearching(true);
     
-    // Simulando a busca no Google Maps (em uma aplicação real, usaríamos a API do Google Maps Places)
     try {
-      toast({
-        title: "Importante",
-        description: "Para buscar leads no Google Maps, é necessário implementar a integração com a API do Google Maps Places. Esta é uma funcionalidade que requer uma chave de API do Google Cloud.",
-      });
+      // Na implementação real, você faria uma chamada para a API do Google Maps
+      const places = await searchGooglePlaces(keyword, location);
       
-      // Simulando resultados de exemplo após um pequeno delay
-      setTimeout(() => {
-        const mockResults = [
-          {
-            businessName: `Loja ${keyword} 1`,
-            contactName: 'Proprietário',
-            phone: '(11) 9999-8888',
-            email: `contato@${keyword.toLowerCase()}1.com.br`,
-            address: `Rua Principal, 123 - ${location}`,
-            industry: keyword,
-            notes: 'Lead encontrado via Google Maps',
-            status: 'new' as LeadStatus
-          },
-          {
-            businessName: `Comercial ${keyword} 2`,
-            contactName: 'Gerente',
-            phone: '(11) 7777-6666',
-            email: `vendas@${keyword.toLowerCase()}2.com.br`,
-            address: `Avenida Central, 456 - ${location}`,
-            industry: keyword,
-            notes: 'Lead encontrado via Google Maps',
-            status: 'new' as LeadStatus
-          }
-        ];
-        
-        // Adiciona os leads encontrados
-        mockResults.forEach(lead => {
+      if (places.length > 0) {
+        // Convertendo cada lugar em um lead e adicionando
+        places.forEach(place => {
+          const lead = convertPlaceToLead(place);
           addLead(lead);
         });
         
         toast({
           title: "Busca concluída",
-          description: `Foram encontrados ${mockResults.length} leads para "${keyword}" em "${location}"`
+          description: `Foram encontrados ${places.length} leads para "${keyword}" em "${location}"`
         });
-        
-        setIsSearching(false);
-      }, 2000);
-      
+      } else {
+        toast({
+          title: "Nenhum resultado",
+          description: `Não foram encontrados resultados para "${keyword}" em "${location}"`,
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       toast({
         title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar leads no Google Maps",
+        description: "Ocorreu um erro ao buscar leads no Google Maps. Verifique sua chave de API.",
         variant: "destructive"
       });
+      console.error('Erro na busca de lugares:', error);
+    } finally {
       setIsSearching(false);
     }
   };
@@ -94,6 +176,41 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         <CardTitle>Buscar Leads no Google Maps</CardTitle>
       </CardHeader>
       <CardContent>
+        {showApiKeyInput ? (
+          <div className="space-y-4 mb-4 p-4 border rounded-md bg-amber-50">
+            <h3 className="font-semibold">Configurar API do Google Maps</h3>
+            <p className="text-sm text-gray-600 mb-2">
+              Para utilizar a busca no Google Maps, você precisa configurar uma chave de API do Google Cloud Platform com a API Places habilitada.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">Google Maps API Key</Label>
+              <Input
+                id="apiKey"
+                placeholder="Insira sua chave de API"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                type="password"
+              />
+              <p className="text-xs text-gray-500">
+                Sua chave será armazenada apenas no seu navegador. <a href="https://developers.google.com/maps/documentation/places/web-service/get-api-key" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Saiba como obter uma chave</a>
+              </p>
+              <Button onClick={saveApiKey} className="w-full">Salvar API Key</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-2 flex justify-between items-center">
+            <p className="text-sm text-gray-600">API do Google Maps configurada</p>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowApiKeyInput(true)}
+              className="text-xs"
+            >
+              Alterar API Key
+            </Button>
+          </div>
+        )}
+        
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -123,13 +240,13 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           <Button 
             type="submit" 
             className="w-full bg-brand-600 hover:bg-brand-700"
-            disabled={isSearching}
+            disabled={isSearching || (!apiKey && !showApiKeyInput)}
           >
             {isSearching ? "Buscando..." : "Buscar no Google Maps"}
           </Button>
           
           <p className="text-sm text-gray-500 mt-2">
-            * Esta funcionalidade simula a busca de leads no Google Maps. Para uma implementação real, é necessário integrar com a API do Google Maps Places e obter uma chave de API do Google Cloud.
+            * A busca faz uso da API do Google Maps Places e pode estar sujeita a limitações e custos de acordo com seu plano do Google Cloud.
           </p>
         </form>
       </CardContent>
