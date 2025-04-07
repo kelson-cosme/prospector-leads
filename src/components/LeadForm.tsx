@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   Dialog,
@@ -33,10 +32,10 @@ import {
 const formSchema = z.object({
   businessName: z.string().min(2, { message: 'Nome da empresa é obrigatório' }),
   contactName: z.string().min(2, { message: 'Nome do contato é obrigatório' }),
-  phone: z.string().optional(),
-  email: z.string().email({ message: 'Email inválido' }).optional().or(z.literal('')),
-  address: z.string().optional(),
-  industry: z.string().optional(),
+  phone: z.string().min(1, { message: 'Telefone é obrigatório' }),
+  email: z.string().email({ message: 'Email inválido' }).min(1, { message: 'Email é obrigatório' }),
+  address: z.string().min(1, { message: 'Endereço é obrigatório' }),
+  industry: z.string().min(1, { message: 'Indústria/Segmento é obrigatório' }),
   notes: z.string().optional(),
   status: z.enum(['new', 'contacted', 'interested', 'proposal', 'closed', 'lost'])
 });
@@ -132,7 +131,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone</FormLabel>
+                    <FormLabel>Telefone *</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -146,7 +145,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email *</FormLabel>
                     <FormControl>
                       <Input {...field} type="email" />
                     </FormControl>
@@ -161,7 +160,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Endereço</FormLabel>
+                  <FormLabel>Endereço *</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -175,7 +174,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
               name="industry"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Indústria/Segmento</FormLabel>
+                  <FormLabel>Indústria/Segmento *</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -189,7 +188,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
               name="status"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
+                  <FormLabel>Status *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
