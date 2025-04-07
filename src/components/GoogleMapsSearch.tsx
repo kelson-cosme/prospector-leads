@@ -27,6 +27,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [corsProxyUrl, setCorsProxyUrl] = useState('https://corsproxy.io/?');
+  const [showCorsWarning, setShowCorsWarning] = useState(false);
   const { toast } = useToast();
   const { addLead } = useLeads();
 
@@ -59,10 +61,25 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
 
   const searchGooglePlaces = async (keyword: string, location: string) => {
     // Construindo a URL para a API Nearby Search do Google Maps Places
-    const url = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
+    const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
+    const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
     try {
-      const response = await fetch(url);
+      const response = await fetch(proxyUrl);
+      
+      // Verificar se a resposta é válida antes de tentar processar como JSON
+      if (!response.ok) {
+        const text = await response.text();
+        console.log("Resposta da API:", text);
+        
+        if (text.includes("See /corsdemo")) {
+          setShowCorsWarning(true);
+          throw new Error("Erro no proxy CORS. É necessário ativar o serviço de proxy.");
+        }
+        
+        throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
       if (data.status === 'OK') {
@@ -73,15 +90,23 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         // Para cada lugar, buscar detalhes adicionais
         for (const place of places.slice(0, 5)) { // Limitando a 5 resultados para evitar muitas requisições
           try {
-            const detailsUrl = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
-            const detailsResponse = await fetch(detailsUrl);
+            const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
+            const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
+            
+            const detailsResponse = await fetch(detailsProxyUrl);
+            
+            if (!detailsResponse.ok) {
+              console.error('Erro ao buscar detalhes:', detailsResponse.status, detailsResponse.statusText);
+              continue;
+            }
+            
             const detailsData = await detailsResponse.json();
             
             if (detailsData.status === 'OK') {
               placeResults.push({
                 ...detailsData.result,
                 place_id: place.place_id,
-                types: place.types
+                types: place.types || []
               });
             }
           } catch (error) {
@@ -91,7 +116,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         
         return placeResults;
       } else {
-        throw new Error(`Erro na API: ${data.status}`);
+        throw new Error(`Erro na API Google Maps: ${data.status} - ${data.error_message || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro na busca:', error);
@@ -100,13 +125,18 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   };
 
   const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
+    // Criar um email baseado no nome do negócio (apenas para exemplo)
+    const businessNameSlug = place.name.toLowerCase()
+      .replace(/[^\w\s]/gi, '') // Remove caracteres especiais
+      .replace(/\s+/g, '');      // Remove espaços
+      
     return {
       businessName: place.name,
       contactName: 'Contato não disponível',
       phone: place.formatted_phone_number || 'Não disponível',
-      email: `contato@${place.name.toLowerCase().replace(/\s+/g, '')}.exemplo`,
+      email: `contato@${businessNameSlug}.exemplo`,
       address: place.formatted_address,
-      industry: place.types[0] || keyword,
+      industry: place.types?.[0] || keyword,
       notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}`,
       status: 'new' as LeadStatus
     };
@@ -135,12 +165,12 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     }
     
     setIsSearching(true);
+    setShowCorsWarning(false);
     
     try {
-      // Na implementação real, você faria uma chamada para a API do Google Maps
       const places = await searchGooglePlaces(keyword, location);
       
-      if (places.length > 0) {
+      if (places && places.length > 0) {
         // Convertendo cada lugar em um lead e adicionando
         places.forEach(place => {
           const lead = convertPlaceToLead(place);
@@ -159,11 +189,22 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         });
       }
     } catch (error) {
-      toast({
-        title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar leads no Google Maps. Verifique sua chave de API.",
-        variant: "destructive"
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      if (errorMessage.includes("CORS") || errorMessage.includes("proxy")) {
+        toast({
+          title: "Erro de CORS",
+          description: "O proxy CORS está bloqueando a requisição. Tente usar outro proxy ou uma solução de servidor.",
+          variant: "destructive"
+        });
+        setShowCorsWarning(true);
+      } else {
+        toast({
+          title: "Erro na busca",
+          description: `Erro: ${errorMessage}`,
+          variant: "destructive"
+        });
+      }
       console.error('Erro na busca de lugares:', error);
     } finally {
       setIsSearching(false);
@@ -208,6 +249,32 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             >
               Alterar API Key
             </Button>
+          </div>
+        )}
+        
+        {showCorsWarning && (
+          <div className="mb-4 p-4 border border-yellow-300 rounded-md bg-yellow-50">
+            <h3 className="font-semibold text-yellow-800">Aviso sobre CORS</h3>
+            <p className="text-sm text-yellow-700 mb-2">
+              Estamos enfrentando problemas com o proxy CORS. O serviço cors-anywhere.herokuapp.com requer autorização prévia.
+            </p>
+            <p className="text-sm text-yellow-700 mb-2">
+              Soluções possíveis:
+            </p>
+            <ol className="list-decimal list-inside text-sm text-yellow-700 mb-2 space-y-1">
+              <li>Visite <a href="https://cors-anywhere.herokuapp.com/corsdemo" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">https://cors-anywhere.herokuapp.com/corsdemo</a> e clique em "Request temporary access to the demo server"</li>
+              <li>Ou use outro serviço de proxy CORS (corsproxy.io já está configurado por padrão)</li>
+              <li>Idealmente, implemente um proxy no seu próprio servidor backend</li>
+            </ol>
+            <div className="space-y-2 mt-2">
+              <Label htmlFor="corsProxy">URL do Proxy CORS</Label>
+              <Input
+                id="corsProxy"
+                placeholder="URL do proxy CORS (ex: https://corsproxy.io/?)"
+                value={corsProxyUrl}
+                onChange={(e) => setCorsProxyUrl(e.target.value)}
+              />
+            </div>
           </div>
         )}
         
