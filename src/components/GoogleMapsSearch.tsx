@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,15 +18,6 @@ interface GooglePlace {
   website?: string;
   place_id: string;
   types: string[];
-<<<<<<< HEAD
-=======
-  geometry?: {
-    location: {
-      lat: number;
-      lng: number;
-    }
-  };
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
 }
 
 const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
@@ -36,11 +26,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-<<<<<<< HEAD
-=======
   const [corsProxyUrl, setCorsProxyUrl] = useState('https://corsproxy.io/?');
   const [showCorsWarning, setShowCorsWarning] = useState(false);
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
   const { toast } = useToast();
   const { addLead } = useLeads();
 
@@ -73,25 +60,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
 
   const searchGooglePlaces = async (keyword: string, location: string) => {
     // Construindo a URL para a API Nearby Search do Google Maps Places
-<<<<<<< HEAD
-    const url = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
-    
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      if (data.status === 'OK') {
-        // Processando os resultados
-        const places = data.results;
-        const placeResults: GooglePlace[] = [];
-        
-        // Para cada lugar, buscar detalhes adicionais
-        for (const place of places.slice(0, 5)) { // Limitando a 5 resultados para evitar muitas requisições
-          try {
-            const detailsUrl = `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
-            const detailsResponse = await fetch(detailsUrl);
-=======
-    const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}+in+${encodeURIComponent(location)}&key=${apiKey}`;
+    const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
     const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
     try {
@@ -113,37 +82,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       const data = await response.json();
       
       if (data.status === 'OK') {
-        // Verificar se os resultados contêm a localização especificada
-        const filteredResults = data.results.filter((place: any) => {
-          // Verificar se o endereço formatado contém a localização especificada
-          return place.formatted_address.toLowerCase().includes(location.toLowerCase());
-        });
-        
-        if (filteredResults.length === 0) {
-          toast({
-            title: "Atenção",
-            description: `Não foram encontrados resultados específicos para "${location}". Verifique a localização ou tente uma busca mais ampla.`,
-            variant: "destructive"
-          });
-          
-          // Se não houver resultados filtrados, use alguns dos resultados originais com uma advertência
-          if (data.results.length > 0) {
-            toast({
-              title: "Resultados alternativos",
-              description: `Mostrando resultados que podem não estar em "${location}".`,
-              variant: "default"
-            });
-          }
-        }
-        
-        // Usar os resultados filtrados se houver, caso contrário, usar os resultados originais
-        const placesToProcess = filteredResults.length > 0 ? filteredResults : data.results;
+        // Processando os resultados
+        const places = data.results;
         const placeResults: GooglePlace[] = [];
         
         // Para cada lugar, buscar detalhes adicionais
-        for (const place of placesToProcess.slice(0, 5)) {
+        for (const place of places.slice(0, 5)) { // Limitando a 5 resultados para evitar muitas requisições
           try {
-            const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website,geometry&key=${apiKey}`;
+            const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
             const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
             
             const detailsResponse = await fetch(detailsProxyUrl);
@@ -153,19 +99,13 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
               continue;
             }
             
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
             const detailsData = await detailsResponse.json();
             
             if (detailsData.status === 'OK') {
               placeResults.push({
                 ...detailsData.result,
                 place_id: place.place_id,
-<<<<<<< HEAD
-                types: place.types
-=======
-                types: place.types || [],
-                geometry: detailsData.result.geometry
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
+                types: place.types || []
               });
             }
           } catch (error) {
@@ -175,11 +115,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         
         return placeResults;
       } else {
-<<<<<<< HEAD
-        throw new Error(`Erro na API: ${data.status}`);
-=======
         throw new Error(`Erro na API Google Maps: ${data.status} - ${data.error_message || 'Erro desconhecido'}`);
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
       }
     } catch (error) {
       console.error('Erro na busca:', error);
@@ -187,53 +123,19 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     }
   };
 
-<<<<<<< HEAD
-=======
-  const extractDomainFromWebsite = (website?: string): string => {
-    if (!website) return '';
-    
-    try {
-      const url = new URL(website);
-      return url.hostname.replace('www.', '');
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const generateEmail = (place: GooglePlace): string => {
-    // Estratégia 1: Usar o domínio do site se disponível
-    const domain = extractDomainFromWebsite(place.website);
-    if (domain) {
-      return `contato@${domain}`;
-    }
-    
-    // Estratégia 2: Criar um slug baseado no nome e na cidade
-    const cityMatch = place.formatted_address.match(/([^,]+),/);
-    const city = cityMatch ? cityMatch[1].trim().toLowerCase().replace(/\s+/g, '') : '';
-    
+  const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
+    // Criar um email baseado no nome do negócio (apenas para exemplo)
     const businessNameSlug = place.name.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
       .replace(/[^\w\s]/gi, '') // Remove caracteres especiais
       .replace(/\s+/g, '');      // Remove espaços
       
-    return `contato@${businessNameSlug}${city ? '.' + city : ''}.com.br`;
-  };
-
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
-  const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
     return {
       businessName: place.name,
       contactName: 'Contato não disponível',
       phone: place.formatted_phone_number || 'Não disponível',
-<<<<<<< HEAD
-      email: `contato@${place.name.toLowerCase().replace(/\s+/g, '')}.exemplo`,
-      address: place.formatted_address,
-      industry: place.types[0] || keyword,
-=======
-      email: generateEmail(place),
+      email: `contato@${businessNameSlug}.exemplo`,
       address: place.formatted_address,
       industry: place.types?.[0] || keyword,
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
       notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}`,
       status: 'new' as LeadStatus
     };
@@ -262,21 +164,12 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     }
     
     setIsSearching(true);
-<<<<<<< HEAD
-    
-    try {
-      // Na implementação real, você faria uma chamada para a API do Google Maps
-      const places = await searchGooglePlaces(keyword, location);
-      
-      if (places.length > 0) {
-=======
     setShowCorsWarning(false);
     
     try {
       const places = await searchGooglePlaces(keyword, location);
       
       if (places && places.length > 0) {
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
         // Convertendo cada lugar em um lead e adicionando
         places.forEach(place => {
           const lead = convertPlaceToLead(place);
@@ -295,13 +188,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         });
       }
     } catch (error) {
-<<<<<<< HEAD
-      toast({
-        title: "Erro na busca",
-        description: "Ocorreu um erro ao buscar leads no Google Maps. Verifique sua chave de API.",
-        variant: "destructive"
-      });
-=======
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       
       if (errorMessage.includes("CORS") || errorMessage.includes("proxy")) {
@@ -318,7 +204,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           variant: "destructive"
         });
       }
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
       console.error('Erro na busca de lugares:', error);
     } finally {
       setIsSearching(false);
@@ -366,8 +251,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           </div>
         )}
         
-<<<<<<< HEAD
-=======
         {showCorsWarning && (
           <div className="mb-4 p-4 border border-yellow-300 rounded-md bg-yellow-50">
             <h3 className="font-semibold text-yellow-800">Aviso sobre CORS</h3>
@@ -394,7 +277,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           </div>
         )}
         
->>>>>>> 4b2037724eb1b453e7eef4868d7582b60981d271
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
