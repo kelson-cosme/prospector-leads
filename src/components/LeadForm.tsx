@@ -30,7 +30,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
-// Define formSchema and make all required fields non-optional to match the Lead type
+// Define formSchema com campos obrigatórios para corresponder à tipagem do Lead
 const formSchema = z.object({
   businessName: z.string().min(2, { message: 'Nome da empresa é obrigatório' }),
   contactName: z.string().min(2, { message: 'Nome do contato é obrigatório' }),
@@ -86,9 +86,20 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
     }
   }, [isOpen, editingLead, form]);
 
+  // Importante: Estamos garantindo que todos os campos sejam definidos aqui
   const handleSubmit = (values: FormValues) => {
-    // Now values will match the required type
-    onSubmit(values);
+    const completeValues: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> = {
+      businessName: values.businessName,
+      contactName: values.contactName,
+      phone: values.phone,
+      email: values.email,
+      address: values.address,
+      industry: values.industry,
+      notes: values.notes || '',
+      status: values.status
+    };
+    
+    onSubmit(completeValues);
     onClose();
   };
 
