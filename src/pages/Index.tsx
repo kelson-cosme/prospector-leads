@@ -7,6 +7,7 @@ import SearchBar from '@/components/SearchBar';
 import LeadsList from '@/components/LeadsList';
 import LeadFormModal from '@/components/LeadForm';
 import DashboardSummary from '@/components/DashboardSummary';
+import GoogleMapsSearch from '@/components/GoogleMapsSearch';
 
 const Index = () => {
   const {
@@ -58,6 +59,10 @@ const Index = () => {
           </p>
           
           <DashboardSummary leads={leads} />
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <GoogleMapsSearch onLeadFound={addLead} />
         </div>
         
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
