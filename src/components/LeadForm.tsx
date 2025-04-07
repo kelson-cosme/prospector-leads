@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Dialog,
@@ -29,6 +30,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
+// Define formSchema and make all required fields non-optional to match the Lead type
 const formSchema = z.object({
   businessName: z.string().min(2, { message: 'Nome da empresa é obrigatório' }),
   contactName: z.string().min(2, { message: 'Nome do contato é obrigatório' }),
@@ -36,8 +38,8 @@ const formSchema = z.object({
   email: z.string().email({ message: 'Email inválido' }).min(1, { message: 'Email é obrigatório' }),
   address: z.string().min(1, { message: 'Endereço é obrigatório' }),
   industry: z.string().min(1, { message: 'Indústria/Segmento é obrigatório' }),
-  notes: z.string().optional(),
-  status: z.enum(['new', 'contacted', 'interested', 'proposal', 'closed', 'lost'])
+  notes: z.string().default(''),
+  status: z.enum(['new', 'contacted', 'interested', 'proposal', 'closed', 'lost']).default('new')
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -85,6 +87,7 @@ const LeadFormModal: React.FC<LeadFormModalProps> = ({
   }, [isOpen, editingLead, form]);
 
   const handleSubmit = (values: FormValues) => {
+    // Now values will match the required type
     onSubmit(values);
     onClose();
   };
