@@ -1,0 +1,114 @@
+
+import React from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Lead, LeadStatus, LeadStatusLabels } from '@/types/lead';
+import { LucidePhone, LucideMail, LucideEdit, LucideTrash, LucideCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+interface LeadCardProps {
+  lead: Lead;
+  onEdit: (lead: Lead) => void;
+  onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: LeadStatus) => void;
+}
+
+const statusBadgeColors: Record<LeadStatus, string> = {
+  new: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+  contacted: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
+  interested: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+  proposal: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
+  closed: 'bg-green-100 text-green-800 hover:bg-green-200',
+  lost: 'bg-red-100 text-red-800 hover:bg-red-200',
+};
+
+const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusChange }) => {
+  return (
+    <Card className="w-full hover:shadow-md transition-shadow duration-200">
+      <CardContent className="p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-3">
+          <h3 className="text-lg font-bold">{lead.businessName}</h3>
+          <Badge className={cn("mt-2 md:mt-0", statusBadgeColors[lead.status])}>
+            {LeadStatusLabels[lead.status]}
+          </Badge>
+        </div>
+        
+        <div className="space-y-2 mb-4">
+          <p className="text-sm text-gray-600">Contato: {lead.contactName}</p>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <LucidePhone size={14} />
+            <span>{lead.phone || "Não informado"}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <LucideMail size={14} />
+            <span>{lead.email || "Não informado"}</span>
+          </div>
+          {lead.industry && (
+            <p className="text-sm text-gray-600">Indústria: {lead.industry}</p>
+          )}
+        </div>
+        
+        {lead.notes && (
+          <div className="mb-4">
+            <p className="text-sm italic text-gray-600">{lead.notes}</p>
+          </div>
+        )}
+        
+        <div className="flex flex-wrap items-center justify-between mt-2">
+          <div className="flex space-x-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-1"
+              onClick={() => onEdit(lead)}
+            >
+              <LucideEdit size={14} />
+              <span>Editar</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
+              onClick={() => onDelete(lead.id)}
+            >
+              <LucideTrash size={14} />
+              <span>Excluir</span>
+            </Button>
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="flex items-center gap-1 mt-2 md:mt-0">
+                <LucideCheck size={14} />
+                <span>Status</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(Object.keys(LeadStatusLabels) as LeadStatus[]).map((status) => (
+                <DropdownMenuItem
+                  key={status}
+                  onClick={() => onStatusChange(lead.id, status)}
+                  className={cn(
+                    lead.status === status && "font-bold",
+                    "cursor-pointer"
+                  )}
+                >
+                  {LeadStatusLabels[status]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default LeadCard;
