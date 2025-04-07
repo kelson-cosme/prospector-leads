@@ -19,6 +19,12 @@ interface GooglePlace {
   website?: string;
   place_id: string;
   types: string[];
+  geometry?: {
+    location: {
+      lat: number;
+      lng: number;
+    }
+  };
 }
 
 const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
@@ -61,7 +67,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
 
   const searchGooglePlaces = async (keyword: string, location: string) => {
     // Construindo a URL para a API Nearby Search do Google Maps Places
-    const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${encodeURIComponent(location)}&key=${apiKey}`;
+    const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}+in+${encodeURIComponent(location)}&key=${apiKey}`;
     const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
     try {
@@ -83,14 +89,37 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       const data = await response.json();
       
       if (data.status === 'OK') {
-        // Processando os resultados
-        const places = data.results;
+        // Verificar se os resultados contêm a localização especificada
+        const filteredResults = data.results.filter((place: any) => {
+          // Verificar se o endereço formatado contém a localização especificada
+          return place.formatted_address.toLowerCase().includes(location.toLowerCase());
+        });
+        
+        if (filteredResults.length === 0) {
+          toast({
+            title: "Atenção",
+            description: `Não foram encontrados resultados específicos para "${location}". Verifique a localização ou tente uma busca mais ampla.`,
+            variant: "destructive"
+          });
+          
+          // Se não houver resultados filtrados, use alguns dos resultados originais com uma advertência
+          if (data.results.length > 0) {
+            toast({
+              title: "Resultados alternativos",
+              description: `Mostrando resultados que podem não estar em "${location}".`,
+              variant: "default"
+            });
+          }
+        }
+        
+        // Usar os resultados filtrados se houver, caso contrário, usar os resultados originais
+        const placesToProcess = filteredResults.length > 0 ? filteredResults : data.results;
         const placeResults: GooglePlace[] = [];
         
         // Para cada lugar, buscar detalhes adicionais
-        for (const place of places.slice(0, 5)) { // Limitando a 5 resultados para evitar muitas requisições
+        for (const place of placesToProcess.slice(0, 5)) {
           try {
-            const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website&key=${apiKey}`;
+            const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website,geometry&key=${apiKey}`;
             const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
             
             const detailsResponse = await fetch(detailsProxyUrl);
@@ -106,7 +135,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
               placeResults.push({
                 ...detailsData.result,
                 place_id: place.place_id,
-                types: place.types || []
+                types: place.types || [],
+                geometry: detailsData.result.geometry
               });
             }
           } catch (error) {
@@ -124,17 +154,42 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     }
   };
 
-  const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
-    // Criar um email baseado no nome do negócio (apenas para exemplo)
+  const extractDomainFromWebsite = (website?: string): string => {
+    if (!website) return '';
+    
+    try {
+      const url = new URL(website);
+      return url.hostname.replace('www.', '');
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const generateEmail = (place: GooglePlace): string => {
+    // Estratégia 1: Usar o domínio do site se disponível
+    const domain = extractDomainFromWebsite(place.website);
+    if (domain) {
+      return `contato@${domain}`;
+    }
+    
+    // Estratégia 2: Criar um slug baseado no nome e na cidade
+    const cityMatch = place.formatted_address.match(/([^,]+),/);
+    const city = cityMatch ? cityMatch[1].trim().toLowerCase().replace(/\s+/g, '') : '';
+    
     const businessNameSlug = place.name.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
       .replace(/[^\w\s]/gi, '') // Remove caracteres especiais
       .replace(/\s+/g, '');      // Remove espaços
       
+    return `contato@${businessNameSlug}${city ? '.' + city : ''}.com.br`;
+  };
+
+  const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
     return {
       businessName: place.name,
       contactName: 'Contato não disponível',
       phone: place.formatted_phone_number || 'Não disponível',
-      email: `contato@${businessNameSlug}.exemplo`,
+      email: generateEmail(place),
       address: place.formatted_address,
       industry: place.types?.[0] || keyword,
       notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}`,
