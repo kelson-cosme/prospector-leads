@@ -4,7 +4,7 @@ import { Lead, LeadStatus } from '../types/lead';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/components/ui/use-toast';
 import { leadsCollection } from '@/services/firebase';
-import { addDoc, doc, deleteDoc, updateDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { addDoc, doc, deleteDoc, updateDoc, collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore';
 
 interface LeadContextType {
@@ -45,6 +45,37 @@ export const LeadProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>(leads);
   const [currentStatus, setCurrentStatus] = useState<LeadStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Carregar leads do Firebase ao iniciar
+  useEffect(() => {
+    const loadLeadsFromFirebase = async () => {
+      try {
+        console.log('Loading leads from Firebase...');
+        const q = query(leadsCollection);
+        const querySnapshot = await getDocs(q);
+        
+        const firebaseLeads: Lead[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          firebaseLeads.push({
+            ...data,
+            id: doc.id,
+            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date()
+          } as Lead);
+        });
+        
+        console.log('Loaded leads from Firebase:', firebaseLeads.length);
+        if (firebaseLeads.length > 0) {
+          setLeads(firebaseLeads);
+        }
+      } catch (error) {
+        console.error('Error loading leads from Firebase:', error);
+      }
+    };
+    
+    loadLeadsFromFirebase();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('leads', JSON.stringify(leads));
@@ -101,11 +132,13 @@ export const LeadProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Also save to Firebase
     try {
-      await addDoc(leadsCollection, {
+      console.log('Adding lead to Firebase:', newLead);
+      const docRef = await addDoc(leadsCollection, {
         ...newLead,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
       });
+      console.log('Lead added to Firebase with ID:', docRef.id);
     } catch (error) {
       console.error("Error adding lead to Firebase:", error);
     }
@@ -127,11 +160,13 @@ export const LeadProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Also update in Firebase
     try {
+      console.log('Updating lead in Firebase:', { id, ...updatedFields });
       const leadRef = doc(db, "leads", id);
       await updateDoc(leadRef, {
         ...updatedFields,
         updatedAt: new Date().toISOString()
       });
+      console.log('Lead updated in Firebase successfully');
     } catch (error) {
       console.error("Error updating lead in Firebase:", error);
     }
@@ -148,8 +183,10 @@ export const LeadProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Also delete from Firebase
     try {
+      console.log('Deleting lead from Firebase:', id);
       const leadRef = doc(db, "leads", id);
       await deleteDoc(leadRef);
+      console.log('Lead deleted from Firebase successfully');
     } catch (error) {
       console.error("Error deleting lead from Firebase:", error);
     }

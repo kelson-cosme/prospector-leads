@@ -5,15 +5,19 @@ import { GooglePlace } from '../types/googlePlace';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_PROJECTIID,
-  projectId: import.meta.env.VITE_PROJECTIID,
-  authDomain: import.meta.env.VITE_AUTHDOMAIN,
-  storageBucket: import.meta.env.VITE_STORAGEBUCKET,
+  apiKey: import.meta.env.VITE_API_KEY,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
 };
+
+console.log('Firebase config:', firebaseConfig);
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+console.log('Firebase initialized');
 
 export const searchResultsCollection = collection(db, 'searchResults');
 export const leadsCollection = collection(db, 'leads');
@@ -25,6 +29,8 @@ export const saveSearchResults = async (
   results: GooglePlace[]
 ) => {
   try {
+    console.log('Saving search results to Firebase:', { keyword, location, resultsCount: results.length });
+    
     const searchData = {
       keyword,
       location,
@@ -42,7 +48,8 @@ export const saveSearchResults = async (
       timestamp: Timestamp.now()
     };
     
-    await addDoc(searchResultsCollection, searchData);
+    const docRef = await addDoc(searchResultsCollection, searchData);
+    console.log('Search results saved with ID:', docRef.id);
     return true;
   } catch (error) {
     console.error("Error saving search results:", error);
@@ -56,6 +63,8 @@ export const getPreviousSearchResults = async (
   location: string
 ): Promise<GooglePlace[]> => {
   try {
+    console.log('Getting previous search results for:', { keyword, location });
+    
     // Query for previous searches with the same keyword and location
     const q = query(
       searchResultsCollection,
@@ -64,17 +73,20 @@ export const getPreviousSearchResults = async (
     );
     
     const querySnapshot = await getDocs(q);
+    console.log('Previous search results query completed, documents count:', querySnapshot.size);
     
     // Extract and combine all results from previous searches
     let allResults: GooglePlace[] = [];
     
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      console.log('Found previous search document:', doc.id);
       if (data.results && Array.isArray(data.results)) {
         allResults = [...allResults, ...data.results];
       }
     });
     
+    console.log('Total previous results found:', allResults.length);
     return allResults;
   } catch (error) {
     console.error("Error getting previous search results:", error);
@@ -85,6 +97,8 @@ export const getPreviousSearchResults = async (
 // Check if a business is already in our leads database
 export const checkLeadExists = async (businessName: string, address: string): Promise<boolean> => {
   try {
+    console.log('Checking if lead exists:', { businessName, address });
+    
     const q = query(
       leadsCollection,
       where("businessName", "==", businessName),
@@ -92,7 +106,9 @@ export const checkLeadExists = async (businessName: string, address: string): Pr
     );
     
     const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
+    const exists = !querySnapshot.empty;
+    console.log('Lead exists?', exists);
+    return exists;
   } catch (error) {
     console.error("Error checking if lead exists:", error);
     return false;

@@ -28,10 +28,13 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const { addLead, leads } = useLeads();
 
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('googleMapsApiKey') || 'AIzaSyC1nxWJ7EYl91R5HjjNmO-NYvm8ihSus1A';
+    console.log('GoogleMapsSearch component initialized');
+    const savedApiKey = localStorage.getItem('googleMapsApiKey') || import.meta.env.VITE_API_KEY;
     if (savedApiKey) {
+      console.log('Using saved API key');
       setApiKey(savedApiKey);
     } else {
+      console.log('No API key found, showing input');
       setShowApiKeyInput(true);
     }
   }, []);
@@ -42,6 +45,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       return placeIdMatch ? placeIdMatch[1] : '';
     }).filter(id => id);
     
+    console.log('Previously added place IDs:', placeIds.length);
     setPreviouslyAddedResults(placeIds);
   }, [leads]);
 
@@ -63,9 +67,12 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   };
 
   const searchGooglePlaces = async (keyword: string, location: string, getNewResults = false) => {
+    console.log('Starting search with params:', { keyword, location, getNewResults });
+    
     // Try to get previous results first unless specifically requesting new results
     if (!getNewResults) {
       try {
+        console.log('Attempting to get previous results');
         const previousResults = await getPreviousSearchResults(keyword, location);
         console.log('Previous results:', previousResults);
         
@@ -74,7 +81,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             !previouslyAddedResults.includes(place.place_id)
           );
           
-          console.log('Not added results:', notAddedResults);
+          console.log('Not added results:', notAddedResults.length);
           
           if (notAddedResults.length > 0) {
             toast({
@@ -94,7 +101,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}+in+${encodeURIComponent(location)}&key=${apiKey}`;
     const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
-    console.log('Fetching from:', proxyUrl);
+    console.log('Fetching from Google API via proxy:', proxyUrl);
     
     try {
       const response = await fetch(proxyUrl);
@@ -102,7 +109,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       
       if (!response.ok) {
         const text = await response.text();
-        console.log("Resposta da API:", text);
+        console.log("Resposta da API (error):", text);
         
         if (text.includes("See /corsdemo")) {
           setShowCorsWarning(true);
@@ -120,7 +127,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           return place.formatted_address.toLowerCase().includes(location.toLowerCase());
         });
         
-        console.log('Filtered results:', filteredResults);
+        console.log('Filtered results count:', filteredResults.length);
         
         if (filteredResults.length === 0) {
           toast({
@@ -139,13 +146,13 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         }
         
         const placesToProcess = filteredResults.length > 0 ? filteredResults : data.results;
-        console.log('Places to process:', placesToProcess);
+        console.log('Places to process:', placesToProcess.length);
         
         const newPlacesToProcess = placesToProcess.filter((place: any) => 
           !previouslyAddedResults.includes(place.place_id)
         ).slice(0, 5);
         
-        console.log('New places to process:', newPlacesToProcess);
+        console.log('New places to process:', newPlacesToProcess.length);
         
         if (newPlacesToProcess.length === 0) {
           if (getNewResults) {
@@ -165,10 +172,11 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         
         for (const place of newPlacesToProcess) {
           try {
+            console.log(`Fetching details for place: ${place.name}`);
             const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website,geometry&key=${apiKey}`;
             const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
             
-            console.log(`Fetching details for ${place.name}:`, detailsProxyUrl);
+            console.log(`Details API URL via proxy: ${detailsProxyUrl}`);
             
             const detailsResponse = await fetch(detailsProxyUrl);
             
@@ -178,7 +186,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             }
             
             const detailsData = await detailsResponse.json();
-            console.log('Details data:', detailsData);
+            console.log('Details data for place:', place.name, detailsData);
             
             if (detailsData.status === 'OK') {
               placeResults.push({
@@ -193,12 +201,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           }
         }
         
-        console.log('Final place results:', placeResults);
+        console.log('Final place results count:', placeResults.length);
         
         // Only save results to Firebase if we have any
         if (placeResults.length > 0) {
           try {
+            console.log('Saving search results to Firebase');
             await saveSearchResults(keyword, location, placeResults);
+            console.log('Search results saved successfully');
           } catch (error) {
             console.error('Erro ao salvar resultados no Firebase:', error);
           }
@@ -286,21 +296,37 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     try {
       console.log('Starting search for:', keyword, 'in', location);
       const places = await searchGooglePlaces(keyword, location);
-      console.log('Search completed, places found:', places);
+      
+      if (!places) {
+        console.log('No places returned from search');
+        toast({
+          title: "Erro na busca",
+          description: "Não foi possível obter resultados. Verifique o console para mais detalhes.",
+          variant: "destructive"
+        });
+        setIsSearching(false);
+        return;
+      }
+      
+      console.log('Search completed, places found:', places.length);
       
       if (places && places.length > 0) {
         let addedCount = 0;
         
         for (const place of places) {
           try {
+            console.log('Checking if lead exists:', place.name);
             const leadExists = await checkLeadExists(place.name, place.formatted_address);
             
             if (!leadExists) {
+              console.log('Adding new lead:', place.name);
               const lead = convertPlaceToLead(place);
               addLead(lead);
               addedCount++;
               
               setPreviouslyAddedResults(prev => [...prev, place.place_id]);
+            } else {
+              console.log('Lead already exists:', place.name);
             }
           } catch (error) {
             console.error('Error processing place:', place, error);
