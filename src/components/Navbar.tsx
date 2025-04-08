@@ -17,7 +17,7 @@ const Navbar: React.FC<NavbarProps> = ({ onOpenAddLeadModal }) => {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-2">
           <LucideShoppingBag size={24} className="text-white" />
-          <span className="text-xl font-bold">Site Seeker</span>
+          <span className="text-xl font-bold">Prospector Clientes</span>
         </div>
         
         {isMobile ? (
