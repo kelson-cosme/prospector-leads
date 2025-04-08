@@ -55,10 +55,10 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
             <LucidePhone size={14} />
             <span>{lead.phone || "Não informado"}</span>
           </div>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
+          {/* <div className="flex items-center space-x-2 text-sm text-gray-600">
             <LucideMail size={14} />
             <span>{lead.email || "Não informado"}</span>
-          </div>
+          </div> */}
           {lead.industry && (
             <p className="text-sm text-gray-600">Indústria: {lead.industry}</p>
           )}
