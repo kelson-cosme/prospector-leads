@@ -6,24 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lead, LeadStatus } from '@/types/lead';
 import { useToast } from '@/hooks/use-toast';
 import { useLeads } from '@/contexts/LeadContext';
+import { GooglePlace } from '@/types/googlePlace';
+import { saveSearchResults, getPreviousSearchResults, checkLeadExists } from '@/services/firebase';
 
 interface GoogleMapsSearchProps {
   onLeadFound: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => void;
-}
-
-interface GooglePlace {
-  name: string;
-  formatted_address: string;
-  formatted_phone_number?: string;
-  website?: string;
-  place_id: string;
-  types: string[];
-  geometry?: {
-    location: {
-      lat: number;
-      lng: number;
-    }
-  };
 }
 
 const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
@@ -34,18 +21,27 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [corsProxyUrl, setCorsProxyUrl] = useState('https://corsproxy.io/?');
   const [showCorsWarning, setShowCorsWarning] = useState(false);
+  const [previouslyAddedResults, setPreviouslyAddedResults] = useState<string[]>([]);
   const { toast } = useToast();
-  const { addLead } = useLeads();
+  const { addLead, leads } = useLeads();
 
   useEffect(() => {
-    // Verificar se já existe uma API key salva no localStorage
-    const savedApiKey = localStorage.getItem('googleMapsApiKey');
+    const savedApiKey = localStorage.getItem('googleMapsApiKey') || 'AIzaSyC1nxWJ7EYl91R5HjjNmO-NYvm8ihSus1A';
     if (savedApiKey) {
       setApiKey(savedApiKey);
     } else {
       setShowApiKeyInput(true);
     }
   }, []);
+
+  useEffect(() => {
+    const placeIds = leads.map(lead => {
+      const placeIdMatch = lead.notes.match(/place_id: ([a-zA-Z0-9_-]+)/);
+      return placeIdMatch ? placeIdMatch[1] : '';
+    }).filter(id => id);
+    
+    setPreviouslyAddedResults(placeIds);
+  }, [leads]);
 
   const saveApiKey = () => {
     if (apiKey.trim()) {
@@ -64,15 +60,32 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     }
   };
 
-  const searchGooglePlaces = async (keyword: string, location: string) => {
-    // Construindo a URL para a API Nearby Search do Google Maps Places
+  const searchGooglePlaces = async (keyword: string, location: string, getNewResults = false) => {
+    if (!getNewResults) {
+      const previousResults = await getPreviousSearchResults(keyword, location);
+      
+      if (previousResults.length > 0) {
+        const notAddedResults = previousResults.filter(place => 
+          !previouslyAddedResults.includes(place.place_id)
+        );
+        
+        if (notAddedResults.length > 0) {
+          toast({
+            title: "Resultados anteriores",
+            description: `Mostrando ${notAddedResults.length} resultados diferentes de buscas anteriores.`
+          });
+          
+          return notAddedResults.slice(0, 5);
+        }
+      }
+    }
+    
     const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}+in+${encodeURIComponent(location)}&key=${apiKey}`;
     const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
     try {
       const response = await fetch(proxyUrl);
       
-      // Verificar se a resposta é válida antes de tentar processar como JSON
       if (!response.ok) {
         const text = await response.text();
         console.log("Resposta da API:", text);
@@ -88,9 +101,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       const data = await response.json();
       
       if (data.status === 'OK') {
-        // Verificar se os resultados contêm a localização especificada
         const filteredResults = data.results.filter((place: any) => {
-          // Verificar se o endereço formatado contém a localização especificada
           return place.formatted_address.toLowerCase().includes(location.toLowerCase());
         });
         
@@ -101,7 +112,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             variant: "destructive"
           });
           
-          // Se não houver resultados filtrados, use alguns dos resultados originais com uma advertência
           if (data.results.length > 0) {
             toast({
               title: "Resultados alternativos",
@@ -111,12 +121,24 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           }
         }
         
-        // Usar os resultados filtrados se houver, caso contrário, usar os resultados originais
         const placesToProcess = filteredResults.length > 0 ? filteredResults : data.results;
         const placeResults: GooglePlace[] = [];
         
-        // Para cada lugar, buscar detalhes adicionais
-        for (const place of placesToProcess.slice(0, 5)) {
+        const newPlacesToProcess = placesToProcess.filter((place: any) => 
+          !previouslyAddedResults.includes(place.place_id)
+        ).slice(0, 5);
+        
+        if (newPlacesToProcess.length === 0) {
+          toast({
+            title: "Sem novos resultados",
+            description: "Todos os resultados já foram adicionados anteriormente. Tentando uma busca mais ampla.",
+            variant: "destructive"
+          });
+          
+          return searchGooglePlaces(keyword, "", true);
+        }
+        
+        for (const place of newPlacesToProcess) {
           try {
             const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website,geometry&key=${apiKey}`;
             const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
@@ -143,6 +165,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           }
         }
         
+        await saveSearchResults(keyword, location, placeResults);
+        
         return placeResults;
       } else {
         throw new Error(`Erro na API Google Maps: ${data.status} - ${data.error_message || 'Erro desconhecido'}`);
@@ -165,25 +189,25 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   };
 
   const generateEmail = (place: GooglePlace): string => {
-    // Estratégia 1: Usar o domínio do site se disponível
     const domain = extractDomainFromWebsite(place.website);
     if (domain) {
       return `contato@${domain}`;
     }
     
-    // Estratégia 2: Criar um slug baseado no nome e na cidade
     const cityMatch = place.formatted_address.match(/([^,]+),/);
     const city = cityMatch ? cityMatch[1].trim().toLowerCase().replace(/\s+/g, '') : '';
     
     const businessNameSlug = place.name.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^\w\s]/gi, '') // Remove caracteres especiais
-      .replace(/\s+/g, '');      // Remove espaços
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^\w\s]/gi, '') // Remove special characters
+      .replace(/\s+/g, '');      // Remove spaces
       
     return `contato@${businessNameSlug}${city ? '.' + city : ''}.com.br`;
   };
 
   const convertPlaceToLead = (place: GooglePlace): Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> => {
+    const initialStatus: LeadStatus = place.website ? 'has_website' : 'new';
+    
     return {
       businessName: place.name,
       contactName: 'Contato não disponível',
@@ -191,8 +215,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       email: generateEmail(place),
       address: place.formatted_address,
       industry: place.types?.[0] || keyword,
-      notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}`,
-      status: 'new' as LeadStatus
+      notes: `Lead encontrado via Google Maps. Website: ${place.website || 'Não disponível'}. place_id: ${place.place_id}`,
+      status: initialStatus
     };
   };
 
@@ -225,15 +249,23 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       const places = await searchGooglePlaces(keyword, location);
       
       if (places && places.length > 0) {
-        // Convertendo cada lugar em um lead e adicionando
-        places.forEach(place => {
-          const lead = convertPlaceToLead(place);
-          addLead(lead);
-        });
+        let addedCount = 0;
+        
+        for (const place of places) {
+          const leadExists = await checkLeadExists(place.name, place.formatted_address);
+          
+          if (!leadExists) {
+            const lead = convertPlaceToLead(place);
+            addLead(lead);
+            addedCount++;
+            
+            setPreviouslyAddedResults(prev => [...prev, place.place_id]);
+          }
+        }
         
         toast({
           title: "Busca concluída",
-          description: `Foram encontrados ${places.length} leads para "${keyword}" em "${location}"`
+          description: `Foram adicionados ${addedCount} novos leads para "${keyword}" em "${location}"`
         });
       } else {
         toast({

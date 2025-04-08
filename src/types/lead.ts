@@ -13,7 +13,7 @@ export interface Lead {
   updatedAt: Date;
 }
 
-export type LeadStatus = 'new' | 'contacted' | 'interested' | 'proposal' | 'closed' | 'lost';
+export type LeadStatus = 'new' | 'contacted' | 'interested' | 'proposal' | 'closed' | 'lost' | 'has_website';
 
 export const LeadStatusLabels: Record<LeadStatus, string> = {
   new: 'Novo',
@@ -21,7 +21,8 @@ export const LeadStatusLabels: Record<LeadStatus, string> = {
   interested: 'Interessado',
   proposal: 'Proposta',
   closed: 'Fechado',
-  lost: 'Perdido'
+  lost: 'Perdido',
+  has_website: 'Já tem site'
 };
 
 export const LeadStatusColors: Record<LeadStatus, string> = {
@@ -30,5 +31,6 @@ export const LeadStatusColors: Record<LeadStatus, string> = {
   interested: 'bg-yellow-100 text-yellow-800',
   proposal: 'bg-orange-100 text-orange-800',
   closed: 'bg-green-100 text-green-800',
-  lost: 'bg-red-100 text-red-800'
+  lost: 'bg-red-100 text-red-800',
+  has_website: 'bg-emerald-100 text-emerald-800'
 };

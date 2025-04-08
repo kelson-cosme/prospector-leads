@@ -27,9 +27,18 @@ const statusBadgeColors: Record<LeadStatus, string> = {
   proposal: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
   closed: 'bg-green-100 text-green-800 hover:bg-green-200',
   lost: 'bg-red-100 text-red-800 hover:bg-red-200',
+  has_website: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200',
 };
 
 const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusChange }) => {
+  // Extract website URL from notes if it exists
+  const websiteMatch = lead.notes.match(/Website: (https?:\/\/[^\s]+)/);
+  const website = websiteMatch ? websiteMatch[1] : null;
+  
+  // Extract place_id from notes if it exists
+  const placeIdMatch = lead.notes.match(/place_id: ([a-zA-Z0-9_-]+)/);
+  const placeId = placeIdMatch ? placeIdMatch[1] : null;
+
   return (
     <Card className="w-full hover:shadow-md transition-shadow duration-200">
       <CardContent className="p-4">
@@ -53,11 +62,20 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
           {lead.industry && (
             <p className="text-sm text-gray-600">Indústria: {lead.industry}</p>
           )}
+          {website && (
+            <p className="text-sm text-gray-600">
+              <a href={website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                Site: {website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </a>
+            </p>
+          )}
         </div>
         
         {lead.notes && (
           <div className="mb-4">
-            <p className="text-sm italic text-gray-600">{lead.notes}</p>
+            <p className="text-sm italic text-gray-600">
+              {lead.notes.replace(/place_id: [a-zA-Z0-9_-]+/, '')}
+            </p>
           </div>
         )}
         
