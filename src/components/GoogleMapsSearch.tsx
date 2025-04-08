@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLeads } from '@/contexts/LeadContext';
 import { GooglePlace } from '@/types/googlePlace';
 import { saveSearchResults, getPreviousSearchResults, checkLeadExists } from '@/services/firebase';
+import { Loader } from 'lucide-react';
 
 interface GoogleMapsSearchProps {
   onLeadFound: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -61,22 +63,28 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   };
 
   const searchGooglePlaces = async (keyword: string, location: string, getNewResults = false) => {
+    // Try to get previous results first unless specifically requesting new results
     if (!getNewResults) {
-      const previousResults = await getPreviousSearchResults(keyword, location);
-      
-      if (previousResults.length > 0) {
-        const notAddedResults = previousResults.filter(place => 
-          !previouslyAddedResults.includes(place.place_id)
-        );
+      try {
+        const previousResults = await getPreviousSearchResults(keyword, location);
         
-        if (notAddedResults.length > 0) {
-          toast({
-            title: "Resultados anteriores",
-            description: `Mostrando ${notAddedResults.length} resultados diferentes de buscas anteriores.`
-          });
+        if (previousResults.length > 0) {
+          const notAddedResults = previousResults.filter(place => 
+            !previouslyAddedResults.includes(place.place_id)
+          );
           
-          return notAddedResults.slice(0, 5);
+          if (notAddedResults.length > 0) {
+            toast({
+              title: "Resultados anteriores",
+              description: `Mostrando ${notAddedResults.length} resultados diferentes de buscas anteriores.`
+            });
+            
+            return notAddedResults.slice(0, 5);
+          }
         }
+      } catch (error) {
+        console.error('Erro ao obter resultados anteriores:', error);
+        // Continue with new search even if getting previous results fails
       }
     }
     
@@ -129,6 +137,10 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         ).slice(0, 5);
         
         if (newPlacesToProcess.length === 0) {
+          if (getNewResults) {
+            throw new Error("Todos os resultados já foram adicionados anteriormente.");
+          }
+          
           toast({
             title: "Sem novos resultados",
             description: "Todos os resultados já foram adicionados anteriormente. Tentando uma busca mais ampla.",
@@ -165,7 +177,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           }
         }
         
-        await saveSearchResults(keyword, location, placeResults);
+        // Only save results to Firebase if we have any
+        if (placeResults.length > 0) {
+          try {
+            await saveSearchResults(keyword, location, placeResults);
+          } catch (error) {
+            console.error('Erro ao salvar resultados no Firebase:', error);
+          }
+        }
         
         return placeResults;
       } else {
@@ -284,6 +303,12 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           variant: "destructive"
         });
         setShowCorsWarning(true);
+      } else if (errorMessage.includes("já foram adicionados")) {
+        toast({
+          title: "Sem novos resultados",
+          description: "Todos os resultados já foram adicionados anteriormente.",
+          variant: "destructive"
+        });
       } else {
         toast({
           title: "Erro na busca",
@@ -293,6 +318,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       }
       console.error('Erro na busca de lugares:', error);
     } finally {
+      // Always reset isSearching to false, even if an error occurred
       setIsSearching(false);
     }
   };
@@ -395,7 +421,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             className="w-full bg-brand-600 hover:bg-brand-700"
             disabled={isSearching || (!apiKey && !showApiKeyInput)}
           >
-            {isSearching ? "Buscando..." : "Buscar no Google Maps"}
+            {isSearching ? (
+              <span className="flex items-center gap-2">
+                <Loader className="h-4 w-4 animate-spin" />
+                Buscando...
+              </span>
+            ) : (
+              "Buscar no Google Maps"
+            )}
           </Button>
           
           <p className="text-sm text-gray-500 mt-2">
