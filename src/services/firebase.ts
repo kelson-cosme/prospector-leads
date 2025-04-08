@@ -5,10 +5,10 @@ import { GooglePlace } from '../types/googlePlace';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  projectId: "site-seeker",
-  authDomain: "site-seeker.firebaseapp.com",
-  storageBucket: "site-seeker.appspot.com",
+  apiKey: import.meta.env.VITE_PROJECTIID,
+  projectId: import.meta.env.VITE_PROJECTIID,
+  authDomain: import.meta.env.VITE_AUTHDOMAIN,
+  storageBucket: import.meta.env.VITE_STORAGEBUCKET,
 };
 
 // Initialize Firebase
