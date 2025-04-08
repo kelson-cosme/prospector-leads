@@ -91,7 +91,7 @@ export const LeadProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast({
         title: "Lead duplicado",
         description: `${lead.businessName} já existe no seu banco de dados`,
-        variant: "warning"
+        variant: "destructive"
       });
       return;
     }

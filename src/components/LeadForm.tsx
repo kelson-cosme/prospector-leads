@@ -39,7 +39,7 @@ const formSchema = z.object({
   address: z.string().min(1, { message: 'Endereço é obrigatório' }),
   industry: z.string().min(1, { message: 'Indústria/Segmento é obrigatório' }),
   notes: z.string().default(''),
-  status: z.enum(['new', 'contacted', 'interested', 'proposal', 'closed', 'lost']).default('new')
+  status: z.enum(['new', 'contacted', 'interested', 'proposal', 'closed', 'lost', 'has_website']).default('new')
 });
 
 type FormValues = z.infer<typeof formSchema>;

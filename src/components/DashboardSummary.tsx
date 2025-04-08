@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lead, LeadStatus, LeadStatusLabels } from '@/types/lead';
-import { LucideBookOpen, LucidePhone, LucideThumbsUp, LucideFileSpreadsheet, LucideCheckCircle, LucideXCircle } from 'lucide-react';
+import { LucideBookOpen, LucidePhone, LucideThumbsUp, LucideFileSpreadsheet, LucideCheckCircle, LucideXCircle, LucideGlobe } from 'lucide-react';
 
 interface DashboardSummaryProps {
   leads: Lead[];
@@ -15,6 +14,7 @@ const statusIcons: Record<LeadStatus, React.ReactNode> = {
   proposal: <LucideFileSpreadsheet className="h-5 w-5 text-orange-500" />,
   closed: <LucideCheckCircle className="h-5 w-5 text-green-500" />,
   lost: <LucideXCircle className="h-5 w-5 text-red-500" />,
+  has_website: <LucideGlobe className="h-5 w-5 text-emerald-500" />,
 };
 
 const DashboardSummary: React.FC<DashboardSummaryProps> = ({ leads }) => {
