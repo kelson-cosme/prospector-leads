@@ -67,11 +67,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     if (!getNewResults) {
       try {
         const previousResults = await getPreviousSearchResults(keyword, location);
+        console.log('Previous results:', previousResults);
         
         if (previousResults.length > 0) {
           const notAddedResults = previousResults.filter(place => 
             !previouslyAddedResults.includes(place.place_id)
           );
+          
+          console.log('Not added results:', notAddedResults);
           
           if (notAddedResults.length > 0) {
             toast({
@@ -91,8 +94,11 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     const googleApiUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}+in+${encodeURIComponent(location)}&key=${apiKey}`;
     const proxyUrl = `${corsProxyUrl}${encodeURIComponent(googleApiUrl)}`;
     
+    console.log('Fetching from:', proxyUrl);
+    
     try {
       const response = await fetch(proxyUrl);
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
         const text = await response.text();
@@ -107,11 +113,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       }
       
       const data = await response.json();
+      console.log('API Response:', data);
       
       if (data.status === 'OK') {
         const filteredResults = data.results.filter((place: any) => {
           return place.formatted_address.toLowerCase().includes(location.toLowerCase());
         });
+        
+        console.log('Filtered results:', filteredResults);
         
         if (filteredResults.length === 0) {
           toast({
@@ -130,11 +139,13 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         }
         
         const placesToProcess = filteredResults.length > 0 ? filteredResults : data.results;
-        const placeResults: GooglePlace[] = [];
+        console.log('Places to process:', placesToProcess);
         
         const newPlacesToProcess = placesToProcess.filter((place: any) => 
           !previouslyAddedResults.includes(place.place_id)
         ).slice(0, 5);
+        
+        console.log('New places to process:', newPlacesToProcess);
         
         if (newPlacesToProcess.length === 0) {
           if (getNewResults) {
@@ -150,10 +161,14 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           return searchGooglePlaces(keyword, "", true);
         }
         
+        const placeResults: GooglePlace[] = [];
+        
         for (const place of newPlacesToProcess) {
           try {
             const detailsApiUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=name,formatted_address,formatted_phone_number,website,geometry&key=${apiKey}`;
             const detailsProxyUrl = `${corsProxyUrl}${encodeURIComponent(detailsApiUrl)}`;
+            
+            console.log(`Fetching details for ${place.name}:`, detailsProxyUrl);
             
             const detailsResponse = await fetch(detailsProxyUrl);
             
@@ -163,6 +178,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
             }
             
             const detailsData = await detailsResponse.json();
+            console.log('Details data:', detailsData);
             
             if (detailsData.status === 'OK') {
               placeResults.push({
@@ -177,6 +193,8 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           }
         }
         
+        console.log('Final place results:', placeResults);
+        
         // Only save results to Firebase if we have any
         if (placeResults.length > 0) {
           try {
@@ -188,6 +206,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         
         return placeResults;
       } else {
+        console.error('API Error:', data.status, data.error_message);
         throw new Error(`Erro na API Google Maps: ${data.status} - ${data.error_message || 'Erro desconhecido'}`);
       }
     } catch (error) {
@@ -265,20 +284,26 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     setShowCorsWarning(false);
     
     try {
+      console.log('Starting search for:', keyword, 'in', location);
       const places = await searchGooglePlaces(keyword, location);
+      console.log('Search completed, places found:', places);
       
       if (places && places.length > 0) {
         let addedCount = 0;
         
         for (const place of places) {
-          const leadExists = await checkLeadExists(place.name, place.formatted_address);
-          
-          if (!leadExists) {
-            const lead = convertPlaceToLead(place);
-            addLead(lead);
-            addedCount++;
+          try {
+            const leadExists = await checkLeadExists(place.name, place.formatted_address);
             
-            setPreviouslyAddedResults(prev => [...prev, place.place_id]);
+            if (!leadExists) {
+              const lead = convertPlaceToLead(place);
+              addLead(lead);
+              addedCount++;
+              
+              setPreviouslyAddedResults(prev => [...prev, place.place_id]);
+            }
+          } catch (error) {
+            console.error('Error processing place:', place, error);
           }
         }
         
@@ -295,6 +320,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Search error details:', errorMessage);
       
       if (errorMessage.includes("CORS") || errorMessage.includes("proxy")) {
         toast({
@@ -316,9 +342,9 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           variant: "destructive"
         });
       }
-      console.error('Erro na busca de lugares:', error);
     } finally {
       // Always reset isSearching to false, even if an error occurred
+      console.log('Search process completed, resetting isSearching');
       setIsSearching(false);
     }
   };
