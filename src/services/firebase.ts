@@ -11,13 +11,18 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
 };
 
-console.log('Firebase config:', firebaseConfig);
+console.log('Initializing Firebase with config:', {
+  apiKey: firebaseConfig.apiKey ? 'API key is set' : 'API key is missing',
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  storageBucket: firebaseConfig.storageBucket
+});
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-console.log('Firebase initialized');
+console.log('Firebase initialized successfully');
 
 export const searchResultsCollection = collection(db, 'searchResults');
 export const leadsCollection = collection(db, 'leads');
@@ -53,7 +58,7 @@ export const saveSearchResults = async (
     return true;
   } catch (error) {
     console.error("Error saving search results:", error);
-    return false;
+    throw error; // Rethrow the error to be handled by the caller
   }
 };
 
@@ -90,7 +95,7 @@ export const getPreviousSearchResults = async (
     return allResults;
   } catch (error) {
     console.error("Error getting previous search results:", error);
-    return [];
+    throw error; // Rethrow the error to be handled by the caller
   }
 };
 

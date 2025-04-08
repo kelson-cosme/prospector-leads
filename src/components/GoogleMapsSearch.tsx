@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,8 +18,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKey] = useState(import.meta.env.VITE_API_KEY);
   const [corsProxyUrl, setCorsProxyUrl] = useState('https://corsproxy.io/?');
   const [showCorsWarning, setShowCorsWarning] = useState(false);
   const [previouslyAddedResults, setPreviouslyAddedResults] = useState<string[]>([]);
@@ -29,15 +27,17 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
 
   useEffect(() => {
     console.log('GoogleMapsSearch component initialized');
-    const savedApiKey = localStorage.getItem('googleMapsApiKey') || import.meta.env.VITE_API_KEY;
-    if (savedApiKey) {
-      console.log('Using saved API key');
-      setApiKey(savedApiKey);
-    } else {
-      console.log('No API key found, showing input');
-      setShowApiKeyInput(true);
+    console.log('Using API key from .env file');
+    
+    if (!apiKey) {
+      console.error('API key is not defined in .env file');
+      toast({
+        title: "Erro de configuração",
+        description: "A chave da API do Google Maps não está definida no arquivo .env",
+        variant: "destructive"
+      });
     }
-  }, []);
+  }, [apiKey, toast]);
 
   useEffect(() => {
     const placeIds = leads.map(lead => {
@@ -49,25 +49,9 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     setPreviouslyAddedResults(placeIds);
   }, [leads]);
 
-  const saveApiKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('googleMapsApiKey', apiKey);
-      setShowApiKeyInput(false);
-      toast({
-        title: "API Key salva",
-        description: "Sua chave da API do Google Maps foi salva localmente"
-      });
-    } else {
-      toast({
-        title: "Chave inválida",
-        description: "Por favor, informe uma chave de API válida",
-        variant: "destructive"
-      });
-    }
-  };
-
   const searchGooglePlaces = async (keyword: string, location: string, getNewResults = false) => {
     console.log('Starting search with params:', { keyword, location, getNewResults });
+    console.log('Using API key:', apiKey ? 'API key is set' : 'API key is missing');
     
     // Try to get previous results first unless specifically requesting new results
     if (!getNewResults) {
@@ -282,11 +266,10 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
     
     if (!apiKey) {
       toast({
-        title: "API Key necessária",
-        description: "Por favor, configure sua chave da API do Google Maps",
+        title: "API Key não encontrada",
+        description: "A chave da API do Google Maps não está definida no arquivo .env",
         variant: "destructive"
       });
-      setShowApiKeyInput(true);
       return;
     }
     
@@ -381,41 +364,6 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
         <CardTitle>Buscar Leads no Google Maps</CardTitle>
       </CardHeader>
       <CardContent>
-        {showApiKeyInput ? (
-          <div className="space-y-4 mb-4 p-4 border rounded-md bg-amber-50">
-            <h3 className="font-semibold">Configurar API do Google Maps</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Para utilizar a busca no Google Maps, você precisa configurar uma chave de API do Google Cloud Platform com a API Places habilitada.
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">Google Maps API Key</Label>
-              <Input
-                id="apiKey"
-                placeholder="Insira sua chave de API"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                type="password"
-              />
-              <p className="text-xs text-gray-500">
-                Sua chave será armazenada apenas no seu navegador. <a href="https://developers.google.com/maps/documentation/places/web-service/get-api-key" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Saiba como obter uma chave</a>
-              </p>
-              <Button onClick={saveApiKey} className="w-full">Salvar API Key</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-2 flex justify-between items-center">
-            <p className="text-sm text-gray-600">API do Google Maps configurada</p>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowApiKeyInput(true)}
-              className="text-xs"
-            >
-              Alterar API Key
-            </Button>
-          </div>
-        )}
-        
         {showCorsWarning && (
           <div className="mb-4 p-4 border border-yellow-300 rounded-md bg-yellow-50">
             <h3 className="font-semibold text-yellow-800">Aviso sobre CORS</h3>
@@ -471,7 +419,7 @@ const GoogleMapsSearch: React.FC<GoogleMapsSearchProps> = ({ onLeadFound }) => {
           <Button 
             type="submit" 
             className="w-full bg-brand-600 hover:bg-brand-700"
-            disabled={isSearching || (!apiKey && !showApiKeyInput)}
+            disabled={isSearching}
           >
             {isSearching ? (
               <span className="flex items-center gap-2">
