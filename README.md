@@ -32,7 +32,7 @@ Ferramenta para prospecção automatizada de leads com base em pesquisas no Goog
 
 - Google Maps API
 - Firebase Firestore
-- (Adicione aqui: ex. Node.js, React, TypeScript, etc.)
+- TypeScript
 
 ## 💡 Casos de Uso
 
