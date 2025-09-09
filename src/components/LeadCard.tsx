@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Lead, LeadStatus, LeadStatusLabels } from '@/types/lead';
-import { LucidePhone, LucideMail, LucideEdit, LucideTrash, LucideCheck } from 'lucide-react';
+import { LucidePhone, LucideMail, LucideEdit, LucideTrash, LucideCheck, LucideMessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -34,10 +33,23 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
   // Extract website URL from notes if it exists
   const websiteMatch = lead.notes.match(/Website: (https?:\/\/[^\s]+)/);
   const website = websiteMatch ? websiteMatch[1] : null;
-  
+
   // Extract place_id from notes if it exists
   const placeIdMatch = lead.notes.match(/place_id: ([a-zA-Z0-9_-]+)/);
   const placeId = placeIdMatch ? placeIdMatch[1] : null;
+
+  const handleWhatsAppClick = () => {
+    // Remove todos os caracteres não numéricos
+    let phoneNumber = lead.phone.replace(/\D/g, '');
+
+    // Verifica se o número já tem o código do país (55) e tem o tamanho correto
+    // Um número brasileiro completo com código do país tem 12 (fixo) ou 13 (celular) dígitos
+    if (phoneNumber.length <= 11) {
+      phoneNumber = `55${phoneNumber}`;
+    }
+    
+    window.open(`https://wa.me/${phoneNumber}`, '_blank');
+  };
 
   return (
     <Card className="w-full hover:shadow-md transition-shadow duration-200">
@@ -48,7 +60,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
             {LeadStatusLabels[lead.status]}
           </Badge>
         </div>
-        
+
         <div className="space-y-2 mb-4">
           <p className="text-sm text-gray-600">Contato: {lead.contactName}</p>
           <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -70,7 +82,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
             </p>
           )}
         </div>
-        
+
         {lead.notes && (
           <div className="mb-4">
             <p className="text-sm italic text-gray-600">
@@ -78,7 +90,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
             </p>
           </div>
         )}
-        
+
         <div className="flex flex-wrap items-center justify-between mt-2">
           <div className="flex space-x-2">
             <Button
@@ -98,6 +110,15 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onEdit, onDelete, onStatusCha
             >
               <LucideTrash size={14} />
               <span>Excluir</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-1"
+              onClick={handleWhatsAppClick}
+            >
+              <LucideMessageSquare size={14} />
+              <span>WhatsApp</span>
             </Button>
           </div>
 
